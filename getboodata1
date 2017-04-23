@@ -1,0 +1,96 @@
+function getareadata {
+  url3=`echo $1 | sed 's/amp;//g'`
+  wget -qO - $url3 | \
+  sed 's///' > tmp3.txt
+
+  tr '\n' ' ' < tmp3.txt > tmp3a.txt
+
+  cat tmp3a.txt | \
+  sed -n -r 's@^.+(<table border.+</table>).+(<table border.+</table>).+$@\1 \2@p' | \
+  sed -e 's@</table>@</table>\n@g' > tmp3b.txt
+
+  cat tmp3b.txt | awk '{if(NR==1)print $0;}' | \
+  sed 's@<tr@\n<tr@g; s@<td@\n<td@g;' | \
+  sed -r 's/\s+$//' \
+  > tmp3b1.txt
+
+  cat tmp3b.txt | awk '{if(NR==2)print $0;}' | \
+  sed 's@<tr@\n<tr@g; s@<td@\n<td@g;' | \
+  sed -r 's/\s+$//' \
+  > tmp3b2.txt
+
+
+  cat tmp3b1.txt | \
+  sed -r -e 's/<tr[^>]*>/#####/g' -e 's@</tr>@\n#####@g' | \
+  sed -r -e 's@<[^>]+>@@g' \
+  > tmp3c1.txt
+
+  cat tmp3b2.txt | \
+  sed -r -e 's/<tr[^>]*>/#####/g' -e 's@</tr>@\n#####@g'  |\
+  sed -r -e 's@<[^>]+>@@g' \
+  > tmp3c2.txt
+
+  cat tmp3c1.txt | sed -r 's/\,//g' |\
+  awk '{if($0=="#####")count++; if (count>=5)print $0;}' \
+  > tmp3d1.txt
+
+  cat tmp3c2.txt | sed -r 's/\,//g' | \
+  awk '{if($0=="#####")count++; if (count>=3)print $0;}' \
+  > tmp3d2.txt
+
+  area=`echo $2 | awk '{printf("%s ", $0);}';`
+
+  echo "Time AreaA AreaB Total TotalA Invalid VoteA VoteB VoteC VoteD VoteE VoteF TotalB Diff Count"
+  (echo $area; cat tmp3d1.txt) | \
+  awk 'BEGIN{n=0;}
+{
+  if (NR==1) {
+    buf[0]=$0; 
+  } else {
+    if ($0 == "#####") {
+      if (n>0) {
+        for (m=1;m<=n;m++) printf("%s ",buf[m]); print "";
+      }
+      n=0;
+    } else {
+      n++; 
+      buf[n]=$0;
+    }
+  }
+}'
+
+  rm tmp3*.txt
+}
+
+function getarealink {
+  url2=`echo $1 | sed 's/amp;//g'`
+  wget -qO - $url2 | \
+  sed -n '/hx fixed/{N;N;N;N;N;N;N;N;N;N;N;N;N; s/\n/ /g; p;}' | \
+  sed -r 's/\s+/ /g' | \
+  sed -n -r 's@^.+hx fixed" href="([^"]+).+<b>([^<]+).+<b>([^<]+).+$@\1 \2 \3@p'  > tmp2.txt
+  cat tmp2.txt | \
+  while read line2; do
+    url2="http://www.projectboo.com"`echo $line2 | awk '{print $1}'`
+    filename2=`echo $line2 | awk '{printf("%s-%s",$2,$3);}'`
+    filetowrite="${filename2}.dat"
+    #echo ${url2} ${filename2}
+    getareadata ${url2} ${filename2} > $filetowrite
+  done
+  rm tmp2.txt
+}
+
+domain="http://www.projectboo.com"
+wget -qO - "${domain}/archive" | \
+sed -n -r 's@^.+<li><a href="(/index.php[^"]+)"[^>]+>([^<]+)<small>\(([0-9]+).+$@\1 \2 \3@p'  > tmp.txt
+
+#echo "Time AreaA AreaB Total TotalA Invalid VoteA VoteB VoteC VoteD VoteE VoteF TotalB Diff Count"
+cat tmp.txt | \
+while read line; do
+  url=${domain}`echo $line | awk '{print $1}'`
+  filename=`echo $line | awk '{print $2}'`".dat"
+  #echo "[ " $url $filename " ]"
+  getarealink $url
+done
+
+rm tmp.txt
+

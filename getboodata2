@@ -1,0 +1,90 @@
+function getareadata {
+  url3=`echo $1 | sed 's/amp;//g'`
+  wget -qO - $url3 | \
+  sed 's///' > tmp3.txt
+
+  tr '\n' ' ' < tmp3.txt > tmp3a.txt
+
+  cat tmp3a.txt | \
+  sed -n -r 's@^.+(<table border.+</table>).+(<table border.+</table>).+$@\1 \2@p' | \
+  sed -e 's@</table>@</table>\n@g' > tmp3b.txt
+
+  cat tmp3b.txt | awk '{if(NR==1)print $0;}' | \
+  sed 's@<tr@\n<tr@g; s@<td@\n<td@g;' | \
+  sed -r 's/\s+$//' \
+  > tmp3b1.txt
+
+  cat tmp3b.txt | awk '{if(NR==2)print $0;}' | \
+  sed 's@<tr@\n<tr@g; s@<td@\n<td@g;' | \
+  sed -r 's/\s+$//' \
+  > tmp3b2.txt
+
+
+  cat tmp3b1.txt | \
+  sed -r -e 's/<tr[^>]*>/#####/g' -e 's@</tr>@\n#####@g' | \
+  sed -r -e 's@<[^>]+>@@g' \
+  > tmp3c1.txt
+
+  cat tmp3b2.txt | \
+  sed -r -e 's/<tr[^>]*>/#####/g' -e 's@</tr>@\n#####@g'  |\
+  sed -r -e 's@<[^>]+>@@g' \
+  > tmp3c2.txt
+
+  cat tmp3c1.txt | sed -r 's/\,//g' |\
+  awk '{if($0=="#####")count++; if (count>=5)print $0;}' \
+  > tmp3d1.txt
+
+  cat tmp3c2.txt | sed -r 's/\,//g' | \
+  awk '{if($0=="#####")count++; if (count>=3)print $0;}' \
+  > tmp3d2.txt
+
+  echo $2 | awk '{printf("%s ", $0);}';
+
+  cat tmp3d2.txt | \
+  awk '
+{
+  if ($0 == "#####") {
+    n=0;
+  } else {
+    n++; 
+    buf2[n] = buf[n];
+    buf[n]=$0;
+  }
+}END{
+  for (n=8;n<=15;n++) printf("%s ",buf2[n]); print "";
+}'
+
+  rm tmp3*.txt
+}
+
+function getarealink {
+  url2=`echo $1 | sed 's/amp;//g'`
+  wget -qO - $url2 | \
+  sed -n '/hx fixed/{N;N;N;N;N;N;N;N;N;N;N;N;N; s/\n/ /g; p;}' | \
+  sed -r 's/\s+/ /g' | \
+  sed -n -r 's@^.+hx fixed" href="([^"]+).+<b>([^<]+).+<b>([^<]+).+$@\1 \2 \3@p'  > tmp2.txt
+  cat tmp2.txt | \
+  while read line2; do
+    url2="http://www.projectboo.com"`echo $line2 | awk '{print $1}'`
+    filename2=`echo $line2 | awk '{printf("%s-%s",$2,$3);}'`
+    #echo ${url2} ${filename2}
+    getareadata ${url2} ${filename2}
+  done
+  rm tmp2.txt
+}
+
+domain="http://www.projectboo.com"
+wget -qO - "${domain}/archive" | \
+sed -n -r 's@^.+<li><a href="(/index.php[^"]+)"[^>]+>([^<]+)<small>\(([0-9]+).+$@\1 \2 \3@p'  > tmp.txt
+
+echo "Area TotalA TotalB Unclassified Pu Mu Invalid Pc Mc"
+cat tmp.txt | \
+while read line; do
+  url=${domain}`echo $line | awk '{print $1}'`
+  filename=`echo $line | awk '{print $2}'`".dat"
+  #echo "[ " $url $filename " ]"
+  getarealink $url
+done
+
+rm tmp.txt
+
